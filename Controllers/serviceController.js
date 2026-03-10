@@ -1,74 +1,77 @@
-const Service = require("../models/Service");
+const Service = require("../models/serviceModel");
 const AppError = require("../utils/appError");
-const catchAsync = require("../utils/catchAsync"); 
+const catchAsync = require("../utils/catchAsync");
 
-exports.addService =catchAsync( async (req,res,next)=>{
-  
-       
-
-        const newService = await Service.create(req.body)
-          
+// ✅ إضافة خدمة
+exports.addService = catchAsync(async(req, res, next) => {
+    req.body.expert = req.user.id;
     
+    if (req.user.role !== 'expert' && req.user.role !== 'admin') {
+        return next(new AppError("Only experts and admins can add services", 403));
+    }
+    
+    const newService = await Service.create(req.body);
+    
+    res.status(201).json({
+        status: "success",
+        message: 'Service added successfully',
+        data: { service: newService }
+    });
+});
 
-        res.status(201).json({
-            success:true,
-            massage:"Service Added Successfully ✅",
-            data:newService
-        })
+// ✅ جلب كل الخدمات
+exports.getAllServices = catchAsync(async(req, res, next) => {
+    const services = await Service.find();
+    
+    res.status(200).json({
+        status: 'success',
+        results: services.length,
+        data: { services }
+    });
+});
 
-
-
-   
-})
-
-
-exports.getAllServices=catchAsync( async (req,res)=>{
-   
-        const services = await Service.find();
-        res.status(200).json({
-            success: true,
-            count:services.length,
-            data:{
-                services
-            }
-        })
-   
-    })
-
-
-
-
-exports.deleteService=catchAsync (async(req,res)=>{
-
-const id = req.params.id;
-const deleteService = await Service.findByIdAndDelete(id);
-if(!deleteService){
-    return next(new AppError("Service not found",404))
-}
-res.status(200).json({
-    success:true,
-    message:"Service deleted successfully! 🗑️"
-})
-
-
-
-})
-
-
-
-exports.updateService=catchAsync(async(req,res,next)=>{
-
-        const id =req.params.id;
-        const updateService= await Service.findByIdAndUpdate(id,req.body,{
-            new:true,
-            runValidators:true
-        });
-        if(!updateService){
-            return next(new AppError("Service Not Found",404))
+// ✅ تحديث خدمة
+exports.updateService = catchAsync(async(req, res, next) => {
+    const service = await Service.findById(req.params.id);
+    
+    if (!service) {
+        return next(new AppError('No service found with this ID', 404));
+    }
+    
+    if (service.expert.toString() !== req.user.id && req.user.role !== 'admin') {
+        return next(new AppError("You don't have permission to update this service", 403));
+    }
+    
+    const updatedService = await Service.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {
+            runValidators: true,
+            new: true
         }
-        res.status(200).json({
-            success:true,
-            message:"service Updated Successfylly ! "
-        })
-  
-})
+    );
+    
+    res.status(200).json({
+        status: 'success',
+        data: { service: updatedService }
+    });
+});
+
+exports.deleteService = catchAsync(async(req, res, next) => {
+    const service = await Service.findById(req.params.id);
+    
+    if (!service) {
+        return next(new AppError("No service found with this ID", 404));
+    }
+    
+    if (service.expert.toString() !== req.user.id && req.user.role !== "admin") {
+        return next(new AppError("You don't have permission to delete this service", 403));
+    }
+    
+    await Service.findByIdAndDelete(req.params.id);
+    
+    res.status(204).json({
+        status: 'success',
+        data: null
+    });
+});

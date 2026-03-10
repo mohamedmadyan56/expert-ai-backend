@@ -1,26 +1,15 @@
-const express = require("express")
+const express = require("express");
 const router = express.Router();
 
-const serviceController = require("../Controllers/serviceController")
-const authController= require("../Controllers/authController");
+const serviceController = require("../Controllers/serviceController");
+const authController = require("../Controllers/authController");
 
-
-
-
-router.get("/all",serviceController.getAllServices)
-
+// 🔒 كل الـ routes محمية
 router.use(authController.protect);
-//ده معناه اي حاجه جايه بعد ال,middleware ده هيتطبق عليه ال protect
 
-
-
-
-
-router.post("/add",authController.restrictTo("expert","admin"),serviceController.addService)
-
-router.delete("/:id",authController.restrictTo("admin"),serviceController.deleteService)
-router.put("/:id",authController.restrictTo("admin"),serviceController.updateService)
-
-
+router.get("/all", serviceController.getAllServices);
+router.post("/create", serviceController.addService);
+router.delete("/delete/:id", serviceController.deleteService);  // ✅ صلحنا
+router.patch("/update/:id", serviceController.updateService);   // ✅ صلحنا
 
 module.exports = router;

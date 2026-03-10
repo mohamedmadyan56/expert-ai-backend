@@ -1,6 +1,6 @@
 const axios = require('axios');
-const catchAsync = require("../Utils/catchAsync");
-const AppError = require("../Utils/appError");
+const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/appError");
 const Consultation = require('../models/consultationModel');
 exports.getAIResponse = catchAsync(async (req, res, next) => {
   const { prompt } = req.body;
@@ -15,7 +15,7 @@ exports.getAIResponse = catchAsync(async (req, res, next) => {
 
     // 2) إرسال الطلب لـ Groq باستخدام أحدث موديل في 2026
     const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
+      'https://api.groq.com/openai/v1/chat/completions', // الموديل بتاع ال api 
       {
         // استخدام Llama 3.3 النسخة الاحترافية
         model: "llama-3.3-70b-versatile", 
@@ -44,10 +44,6 @@ exports.getAIResponse = catchAsync(async (req, res, next) => {
     const aiReply = response.data.choices[0].message.content;
 
     // 4) إرسال الرد للـ Client
-    await Consultation.create({
-      userPrompt: prompt,
-      aiReply: aiReply
-    });
     res.status(200).json({
       status: "success",
       data: {

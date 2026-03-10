@@ -1,0 +1,3 @@
+[submodule "expert-ai-client"]
+	path = expert-ai-client
+	url = https://github.com/mohamedmadyan56/expert-ai-client.git
