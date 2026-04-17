@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Expertly AI — دليل الشرح والمراجعة</title>
+  <style>
+body {
+  direction: rtl;
+  text-align: right;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+h1, h2, h3, h4 {
+  text-align: right;
+}
+code, pre {
+  direction: ltr;
+  text-align: left;
+}
+table {
+  direction: rtl;
+}
+
+@media print {
+  body { font-size: 10pt; }
+  h1 { page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+}
+  </style>
+</head>
+<body>
+<h1>Expertly AI — شرح مفصّل للكود وما الذي تراجعه أولاً</h1>
+<p><strong>المشروع:</strong> منصة تربط المستخدمين بخبراء وخدمات، مع شات ذكاء اصطناعي (Groq)، وملف تعريف، وخدمات، وبورتفوليو مع رفع صور (Cloudinary).</p>
+<p><strong>التقنيات الأساسية:</strong> Node.js + Express 5 + MongoDB/Mongoose، وواجهة React 19 + Vite + Tailwind في مجلد <code>expert-ai-client</code>.</p>
+<hr>
+<h2>1. هيكل المجلدات (ماذا يعني كل جزء؟)</h2>
+<table>
+<thead>
+<tr>
+<th>المسار</th>
+<th>الوظيفة</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server.js</code></td>
+<td>نقطة تشغيل السيرفر: إعداد Express، CORS، الميدلوير، المسارات، الاتصال بـ MongoDB.</td>
+</tr>
+<tr>
+<td><code>Routes/</code></td>
+<td>تعريف عناوين الـ API وربطها بدوال الـ Controller (فصل التوجيه عن المنطق).</td>
+</tr>
+<tr>
+<td><code>Controllers/</code></td>
+<td>منطق الطلبات: قراءة <code>req</code>، التحدث مع قاعدة البيانات أو APIs خارجية، إرسال <code>res</code>.</td>
+</tr>
+<tr>
+<td><code>models/</code></td>
+<td>مخططات Mongoose (شكل المستندات في MongoDB + تحقق + خطافات pre-save).</td>
+</tr>
+<tr>
+<td><code>Middlewares/</code></td>
+<td>دوال تشتغل بين الطلب والـ Controller (رفع ملفات، معالجة أخطاء عامة).</td>
+</tr>
+<tr>
+<td><code>utils/</code></td>
+<td>أدوات مشتركة: <code>catchAsync</code>, <code>AppError</code>, إعداد Cloudinary.</td>
+</tr>
+<tr>
+<td><code>public/</code></td>
+<td>ملفات ثابتة (مثل صور المستخدمين بعد المعالجة بـ Sharp).</td>
+</tr>
+<tr>
+<td><code>expert-ai-client/</code></td>
+<td>تطبيق React: صفحات، سياق مصادقة، استدعاءات axios للـ API.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. الملف الرئيسي: <code>server.js</code></h2>
+<h3>2.1 إنشاء التطبيق والـ CORS</h3>
+<ul>
+<li><strong><code>express()</code>:</strong> إنشاء تطبيق HTTP.</li>
+<li><strong><code>allowedOrigins</code>:</strong> قائمة بالنطاقات المسموح لها تستدعي الـ API (Netlify + localhost للتطوير).</li>
+<li><strong><code>cors({ origin, credentials: true })</code>:</strong>  <ul>
+<li><strong>لزومه:</strong> المتصفح يمنع موقع على دومين من طلب موقع على دومين آخر إلا بقواعد CORS صحيحة.  </li>
+<li><strong><code>credentials: true</code>:</strong> ضروري لأنك تستخدم <strong>كوكيز</strong> (<code>user_token</code>)؛ بدونها المتصفح لن يرسل الكوكي مع الطلبات من الفرونت.</li>
+</ul>
+</li>
+</ul>
+<h3>2.2 الميدلوير الأساسية</h3>
+<ul>
+<li><strong><code>express.json({ limit: &#39;10kb&#39; })</code>:</strong> تحويل جسم الطلب JSON إلى <code>req.body</code>، مع حد حجم يقلل هجمات إرسال أجسام ضخمة.</li>
+<li><strong><code>cookie-parser</code>:</strong> يملأ <code>req.cookies</code> حتى يقرأ <code>protect</code> التوكن من الكوكي.</li>
+</ul>
+<h3>2.3 الملفات الثابتة ومجلد الصور</h3>
+<ul>
+<li><strong><code>express.static(&#39;public&#39;)</code>:</strong> تقديم ملفات من <code>public</code> مباشرة عبر HTTP.</li>
+<li><strong>إنشاء <code>public/img/users</code>:</strong> يضمن أن <code>sharp</code> يستطيع حفظ صورة المستخدم بعد الرفع بدون خطأ &quot;المجلد غير موجود&quot;.</li>
+</ul>
+<h3>2.4 تسجيل المسارات</h3>
+<p>كل مجموعة تحت بادئة واضحة (<code>/api/v1/...</code>) لتسهيل الإصدار لاحقاً وفصل الـ API عن أي مسارات مستقبلية.</p>
+<h3>2.5 معالج الأخطاء العام</h3>
+<ul>
+<li><strong><code>globalErrorHandler</code>:</strong> آخر ميدلوير؛ أي خطأ يُمرَّر بـ <code>next(err)</code> يصل هنا ويُرجع JSON موحّد.</li>
+</ul>
+<h3>2.6 Mongoose و <code>listen</code></h3>
+<ul>
+<li><strong><code>mongoose.connect(DATABASE_URL)</code>:</strong> الاتصال بقاعدة البيانات قبل/أثناء استقبال الطلبات.</li>
+<li><strong><code>app.listen(PORT)</code>:</strong> بدء السيرفر على المنفذ من <code>PORT</code> أو 5000.</li>
+</ul>
+<p><strong>ما تراجعه هنا:</strong> ترتيب الميدلوير (CORS → json → cookie → routes → error handler)، وقائمة <code>allowedOrigins</code> عند النشر على دومين جديد.</p>
+<hr>
+<h2>3. المصادقة والأمان — <code>Controllers/authController.js</code></h2>
+<h3><code>signToken(id)</code></h3>
+<ul>
+<li><strong>الوظيفة:</strong> إنشاء JWT يحتوي <code>id</code> المستخدم، موقّع بـ <code>JWT_SECRET</code>، بمدة <code>JWT_EXPIRES_IN</code> أو 90 يوماً افتراضياً.</li>
+<li><strong>لزومه:</strong> هوية المستخدم في الطلبات اللاحقة بدون إرسال كلمة المرور في كل مرة.</li>
+</ul>
+<h3><code>signup</code></h3>
+<ul>
+<li>ينشئ مستخدماً من <code>req.body</code> عبر <code>User.create</code>.</li>
+<li>يولّد توكناً ويضعه في كوكي <code>user_token</code> (<code>httpOnly</code> يقلل خطر سرقة التوكن بسكربت XSS).</li>
+<li>يرجع أيضاً التوكن في JSON (مفيد لـ Postman أو لو الفرونت يخزّن التوكن في <code>localStorage</code>).</li>
+</ul>
+<h3><code>login</code></h3>
+<ul>
+<li>يتحقق من وجود <code>email</code> و<code>password</code>.</li>
+<li>يجلب المستخدم مع <code>+password</code> لأن الحقل مخفي افتراضياً في الموديل.</li>
+<li>يقارن كلمة المرور بـ <code>correctPassword</code> (bcrypt).</li>
+<li>يضع نفس الكوكي ويرجع التوكن والمستخدم.</li>
+</ul>
+<h3><code>protect</code> (ميدلوير حماية)</h3>
+<ul>
+<li>يبحث عن التوكن بالترتيب: <strong>Header <code>Authorization: Bearer ...</code></strong> ثم <strong>كوكي <code>user_token</code></strong>.</li>
+<li>يتحقق من التوكن بـ <code>jwt.verify</code>.</li>
+<li>يتأكد أن المستخدم موجود و<code>active !== false</code>.</li>
+<li>يستدعي <code>changePasswordAfter</code> لرفض توكنات قديمة بعد تغيير كلمة المرور.</li>
+<li>يضع <strong><code>req.user</code></strong> للمسارات التالية.</li>
+</ul>
+<h3><code>restrictTo(...roles)</code></h3>
+<ul>
+<li>يعيد ميدلويراً يتحقق من <code>req.user.role</code>؛ مفيد لاحقاً لمسارات الأدمن فقط (حالياً جزء من الخدمات يعتمد على فحص الدور داخل الـ Controller).</li>
+</ul>
+<p><strong>ما تراجعه:</strong> في الإنتاج غالباً <code>secure: true</code> للكوكي مع HTTPS؛ إزالة أو تقليل <code>console.log</code> للتوكن في الإنتاج.</p>
+<hr>
+<h2>4. المستخدم والصورة — <code>Controllers/userController.js</code></h2>
+<h3><code>filterObj(obj, ...allowedFields)</code></h3>
+<ul>
+<li><strong>الوظيفة:</strong> نسخ حقول محددة فقط من <code>req.body</code>.</li>
+<li><strong>لزومه:</strong> منع المستخدم من تحديث حقول حساسة مثل <code>role</code> أو <code>password</code> عبر نفس مسار البروفايل.</li>
+</ul>
+<h3>إعداد Multer (<code>multerStorage</code>, <code>multerFilter</code>, <code>upload</code>)</h3>
+<ul>
+<li><strong>الذاكرة:</strong> الصورة تُقرأ كـ <code>buffer</code> (مناسب لـ Sharp قبل الحفظ على القرص).</li>
+<li><strong><code>fileFilter</code>:</strong> يرفض أي ملف ليس صورة.</li>
+</ul>
+<h3><code>uploadUserPhoto</code></h3>
+<ul>
+<li><strong><code>upload.single(&#39;photo&#39;)</code>:</strong> ميدلوير يتوقع حقل الملف اسمه <code>photo</code> في الـ multipart.</li>
+</ul>
+<h3><code>resizeUserPhoto</code></h3>
+<ul>
+<li><strong>Sharp:</strong> تغيير مقاس الصورة إلى 500×500، JPEG بجودة 90، وحفظها في <code>public/img/users</code> باسم فريد.</li>
+<li><strong>لزومه:</strong> توحيد حجم الصور وتقليل المساحة وتحسين الأداء.</li>
+</ul>
+<h3><code>updateMe</code></h3>
+<ul>
+<li>يرفض تحديث كلمة المرور من هذا المسار.</li>
+<li>يبني <code>filteredBody</code> من الحقول المسموحة (الاسم، bio، headline، روابط، إلخ).</li>
+<li>يتعامل مع <code>skills</code> سواء من FormData كـ <code>skills[]</code> أو JSON.</li>
+<li>إن وُجد ملف، يضيف <code>photo</code> باسم الملف المحفوظ.</li>
+<li><strong><code>findByIdAndUpdate</code></strong> مع <code>runValidators: true</code>.</li>
+</ul>
+<h3><code>getMe</code></h3>
+<ul>
+<li>يرجع المستخدم الحالي اعتماداً على <code>req.user.id</code> من <code>protect</code>.</li>
+</ul>
+<h3><code>deleteMe</code></h3>
+<ul>
+<li><strong>حذف منطقي:</strong> <code>active: false</code> بدلاً من مسح السجل (يحافظ على البيانات ويمنع الدخول حسب منطقك).</li>
+</ul>
+<p><strong>ما تراجعه:</strong> أي حقل جديد في الموديل يظهر في البروفايل يجب إضافته لـ <code>filterObj</code> إن كان مسموحاً.</p>
+<hr>
+<h2>5. الخدمات — <code>Controllers/serviceController.js</code></h2>
+<h3><code>addService</code></h3>
+<ul>
+<li>يربط <code>req.body.expert</code> بـ <code>req.user.id</code>.</li>
+<li>يسمح بإضافة الخدمة لـ <code>expert</code> أو <code>admin</code> فقط.</li>
+<li>ينشئ مستند <code>Service</code>.</li>
+</ul>
+<h3><code>getAllServices</code></h3>
+<ul>
+<li><strong><code>Service.find()</code></strong> — مع ملاحظة أن الموديل يعمل <code>populate</code> تلقائياً لبيانات الخبير في استعلامات <code>find</code> (انظر الموديل).</li>
+</ul>
+<h3><code>updateService</code> / <code>deleteService</code></h3>
+<ul>
+<li>يتحققان أن الخدمة موجودة.</li>
+<li>يسمحان للمالك (<code>service.expert</code>) أو للـ <code>admin</code> بالتعديل/الحذف.</li>
+</ul>
+<p><strong>ما تراجعه:</strong> توافق أسماء الحقول مع ما يرسله الفرونت؛ صلاحيات الأدمن مقابل الخبير.</p>
+<hr>
+<h2>6. الشات مع Groq — <code>Controllers/chatController.js</code></h2>
+<h3>إعداد <code>Groq</code></h3>
+<ul>
+<li>عميل SDK يستخدم <code>GROQ_API_KEY</code> من البيئة.</li>
+</ul>
+<h3><code>sendMessage</code></h3>
+<ol>
+<li>التحقق من وجود <code>message</code>.</li>
+<li>حفظ رسالة المستخدم في <code>Message</code> مع <code>role: &#39;user&#39;</code>.</li>
+<li>استدعاء Groq (<code>llama-3.1-8b-instant</code>) والحصول على النص.</li>
+<li>حفظ رد المساعد في MongoDB بـ <code>role: &#39;assistant&#39;</code>.</li>
+<li>إرجاع آخر رسالة (كائن الـ AI) للفرونت.</li>
+</ol>
+<h3><code>getChatHistory</code></h3>
+<ul>
+<li>جلب كل رسائل <code>req.user.id</code> مرتبة زمنياً.</li>
+</ul>
+<p><strong>ما تراجعه:</strong> اختلاف الموديل هنا عن <code>aiController</code> (موديل أخف للشات السريع مقابل موديل أثقل للاستشارة) — هل هذا مقصود؟ معالجة الأخطاء من Groq ورسائل المستخدم بالعربية واضحة.</p>
+<hr>
+<h2>7. استشارة AI (مسار منفصل) — <code>Controllers/aiController.js</code></h2>
+<h3><code>getAIResponse</code></h3>
+<ul>
+<li>يتوقع <code>prompt</code> في الـ body.</li>
+<li>يستدعي <strong>REST</strong> لـ Groq (<code>axios.post</code> إلى <code>chat/completions</code>) بموديل <strong><code>llama-3.3-70b-versatile</code></strong>.</li>
+<li>يرجع <code>{ reply }</code> في JSON.</li>
+<li>في الخطأ: يرجع حالة HTTP من الاستجابة إن وُجدت مع <code>details</code>.</li>
+</ul>
+<p><strong>ملاحظة للمراجعة:</strong> يوجد استيراد <code>Consultation</code> في الملف لكن <strong>لا يُستخدم</strong> في الكود الحالي — يمكن حذفه أو إكمال ميزة حفظ الاستشارات في <code>consultationModel</code>.</p>
+<hr>
+<h2>8. إحصائيات — <code>Controllers/statsController.js</code></h2>
+<h3><code>getPlatformStats</code></h3>
+<ul>
+<li><strong><code>User.countDocuments()</code></strong> لعدد المستخدمين.</li>
+<li>باقي الحقول (<code>totalQueries</code>, <code>aiModelsActive</code>, <code>serverUptime</code>) <strong>قيم تجريبية/ثابتة</strong> وليست من قاعدة البيانات — مفيدة لواجهة &quot;أرقام تقريبية&quot; لكن يجب توثيق ذلك.</li>
+</ul>
+<h3><code>getAboutStats</code></h3>
+<ul>
+<li>آخر 3 مستخدمين (<code>sort</code> بـ <code>createdAt</code>) مع <code>name</code> و<code>createdAt</code>.</li>
+<li>إجمالي المستخدمين.</li>
+</ul>
+<p><strong>ما تراجعه:</strong> إن أردت أرقاماً حقيقية للاستعلامات، تحتاج جمعاً من موديل الرسائل أو سجلات منفصلة.</p>
+<hr>
+<h2>9. البورتفوليو — <code>Controllers/portfolioController.js</code></h2>
+<h3><code>createPortfolio</code></h3>
+<ul>
+<li>يتطلب ملف صورة (<code>req.file</code>).</li>
+<li>يقرأ <strong><code>userid</code> من الهيدر</strong> (ليس JWT من <code>protect</code>).</li>
+<li>يحوّل الصورة إلى Data URL base64 ويرفعها لـ Cloudinary تحت مجلد <code>expertly_portfolio</code>.</li>
+<li>ينشئ سجل <code>Portfolio</code> مع <code>imageUrl</code> من Cloudinary.</li>
+</ul>
+<h3><code>getAllPortfolio</code></h3>
+<ul>
+<li>يجلب أعمال الخبير حسب <code>userid</code> في الهيدر، مرتبة من الأحدث.</li>
+</ul>
+<h3><code>deletePortfolio</code></h3>
+<ul>
+<li>يتحقق من الملكية: <code>portfolioItem.expert</code> يجب أن يساوي <code>userid</code> من الهيدر.</li>
+</ul>
+<p><strong>ما تراجعه (مهم جداً):</strong> الاعتماد على هيدر <code>userid</code> <strong>سهل تزويره</strong> إن لم يكن الطلب محمياً بطبقة أخرى؛ الأفضل ربط البورتفوليو بـ <code>protect</code> واستخدام <code>req.user.id</code> بدلاً من ثقة الهيدر اليدوي.</p>
+<hr>
+<h2>10. المسارات <code>Routes/*</code></h2>
+<table>
+<thead>
+<tr>
+<th>الملف</th>
+<th>الوظيفة</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>userRoutes.js</code></td>
+<td><code>signup</code>, <code>login</code>؛ <code>updateMe</code> + رفع صورة + <code>getMe</code>, <code>deleteMe</code> تحت <code>protect</code>.</td>
+</tr>
+<tr>
+<td><code>serviceRoutes.js</code></td>
+<td><code>router.use(protect)</code> — كل المسارات تتطلب تسجيل الدخول.</td>
+</tr>
+<tr>
+<td><code>aiRoutes.js</code></td>
+<td><code>POST /consult</code> محمي بـ <code>protect</code>.</td>
+</tr>
+<tr>
+<td><code>chatRoutes.js</code></td>
+<td><code>router.use(protect)</code> ثم GET/POST على <code>/</code>.</td>
+</tr>
+<tr>
+<td><code>statsRoutes.js</code></td>
+<td>إحصائيات عامة بدون <code>protect</code> في الملف الحالي.</td>
+</tr>
+<tr>
+<td><code>portfolioRoutes.js</code></td>
+<td>GET/POST/DELETE <strong>بدون</strong> <code>protect</code> — يعتمد على هيدر <code>userid</code>.</td>
+</tr>
+</tbody></table>
+<p><strong>ما تراجعه:</strong> توحيد سياسة الحماية (JWT/cookie لكل شيء يخص مستخدماً معيّناً).</p>
+<hr>
+<h2>11. الموديلات <code>models/*</code></h2>
+<h3><code>userModel.js</code></h3>
+<ul>
+<li>حقول الملف الشخصي، الدور، كلمة المرور، <code>active</code>, <code>passwordChangedAt</code>.</li>
+<li><strong><code>pre(&#39;save&#39;)</code>:</strong> تشفير كلمة المرور بـ bcrypt عند التعديل.</li>
+<li><strong><code>correctPassword</code> / <code>changePasswordAfter</code>:</strong> للدخول وإبطال التوكن بعد تغيير كلمة المرور.</li>
+<li><strong><code>virtual daysOnPlatform</code>:</strong> عمر الحساب بالأيام (حساب من <code>createdAt</code>).</li>
+</ul>
+<h3><code>serviceModel.js</code></h3>
+<ul>
+<li>حقول الخدمة (عنوان، وصف، سعر، تصنيف، مدة تسليم، خبير، تقييمات).</li>
+<li><strong><code>pre(/^find/)</code>:</strong> populate للخبير مع حقول محددة.</li>
+</ul>
+<h3><code>messageModel.js</code></h3>
+<ul>
+<li>رسالة مرتبطة بمستخدم، نص، دور <code>user</code> أو <code>assistant</code>.</li>
+</ul>
+<h3><code>consultationModel.js</code></h3>
+<ul>
+<li>مخطط لاستشارات (prompt/reply) — <strong>جاهز لاستخدام</strong> لكن غير مربوط بـ <code>aiController</code> حالياً.</li>
+</ul>
+<h3><code>Portfolio.js</code></h3>
+<ul>
+<li>عمل مرتبط بخبير، عنوان، وصف، <code>imageUrl</code>, تصنيف، رابط اختياري.</li>
+</ul>
+<h3><code>Service.js</code> (جذر <code>models/</code>)</h3>
+<ul>
+<li><strong>تكرار محتمل:</strong> يعرّف موديلاً باسم <code>Service</code> بسيطاً؛ التطبيق الفعلي للخدمات يستخدم <strong><code>serviceModel.js</code></strong>. راجع أيهما تريد الاحتفاظ به لتجنب الالتباس.</li>
+</ul>
+<hr>
+<h2>12. الميدلوير والأدوات المساعدة</h2>
+<h3><code>Middlewares/errorMiddleware.js</code></h3>
+<ul>
+<li>معالج أخطاء بسيط: يضبط <code>statusCode</code> الافتراضي 500 ويرجع <code>message</code> و<code>stack</code> دائماً.</li>
+</ul>
+<h3><code>Middlewares/uploadMiddleware.js</code></h3>
+<ul>
+<li>Multer ذاكرة، حد 5MB، صور فقط — لمسار البورتفوليو.</li>
+</ul>
+<h3><code>utils/catchAsync.js</code></h3>
+<ul>
+<li>يلف الدالة غير المتزامنة ويمرّر أي <code>reject</code> إلى <code>next</code> — يقلل <code>try/catch</code> المتكرر.</li>
+</ul>
+<h3><code>utils/appError.js</code></h3>
+<ul>
+<li>خطأ تشغيلي متوقع برسالة وحالة HTTP و<code>isOperational</code>.</li>
+</ul>
+<h3><code>utils/cloudinary.js</code></h3>
+<ul>
+<li>تهيئة Cloudinary من متغيرات البيئة.</li>
+</ul>
+<h3><code>Controllers/errorController.js</code></h3>
+<ul>
+<li>معالج أخطاء أكثر تفصيلاً (dev vs prod) ومعالجة <code>JsonWebTokenError</code> — <strong>ملاحظة:</strong> المسار المستورد <code>../Utils/appError</code> قد يفشل على أنظمة حساسة لحالة الأحرف؛ والسيرفر الحالي يستخدم <strong><code>errorMiddleware.js</code></strong> وليس هذا الملف. راجع أي ملف تريده فعلياً كمعالج مركزي.</li>
+</ul>
+<hr>
+<h2>13. الواجهة الأمامية <code>expert-ai-client</code></h2>
+<h3><code>main.jsx</code></h3>
+<ul>
+<li><strong><code>BrowserRouter</code>:</strong> تفعيل React Router.</li>
+<li><strong><code>AuthProvider</code>:</strong> يوفّر حالة المستخدم لكل الشجرة.</li>
+</ul>
+<h3><code>App.jsx</code></h3>
+<ul>
+<li>حماية المسارات: مثلاً <code>/chat</code>, <code>/profile</code>, <code>/portfolio</code> تتطلب <code>user</code>؛ غير المسجلين يُوجَّهون لـ <code>/login</code>.</li>
+<li><strong>ملاحظة:</strong> مسار <code>/service</code> يستخدم <code>Navigate to=&quot;/service&quot;</code> عند عدم وجود مستخدم — قد يسبب حلقة؛ المراجعة المنطقية تقترح التوجيه إلى <code>/login</code> مثل الصفحات الأخرى.</li>
+</ul>
+<h3><code>context/AuthContext.jsx</code></h3>
+<ul>
+<li>عند التحميل: يقرأ <code>token</code> و<code>user</code> من <code>localStorage</code>.</li>
+<li><code>login</code> / <code>logout</code> لتحديث التخزين والحالة.</li>
+</ul>
+<h3><code>Login.jsx</code> (مراجعة دقيقة)</h3>
+<ul>
+<li>يرسل طلباً مع <code>withCredentials: true</code> (مناسب للكوكي).</li>
+<li>يجب التأكد أن استدعاء <code>login(user, token)</code> يمرّر <strong><code>response.data.token</code></strong> وليس حقلاً خاطئاً من الاستجابة — وإلا لن يعمل Bearer في الشات.</li>
+</ul>
+<h3><code>Chat.jsx</code></h3>
+<ul>
+<li>جلب التاريخ: <code>GET /api/v1/chat</code> مع <code>Authorization: Bearer</code>.</li>
+<li>إرسال رسالة: <code>POST</code> بنفس الهيدر.</li>
+<li>عرض الرسائل مع تمرير تلقائي للأسفل.</li>
+</ul>
+<h3><code>portfolioPage.tsx</code></h3>
+<ul>
+<li>يستخدم <code>EXPERT_ID</code> ثابتاً وهيدر <code>userid</code> — مناسب للتجربة لكن للإنتاج يجب ربطه بـ <code>user._id</code> من السياق بعد تسجيل الدخول.</li>
+</ul>
+<h3>مجلد <code>Node&amp;Express&amp;Mongodb</code> داخل <code>src/components/</code></h3>
+<ul>
+<li>يبدو <strong>نسخاً تعليمية/قديمة</strong> من باكند وليست جزءاً من تشغيل التطبيق الفعلي؛ يمكن أرشفتها لتقليل الالتباس.</li>
+</ul>
+<hr>
+<h2>14. متغيرات البيئة (ما تحتاجه)</h2>
+<ul>
+<li><strong><code>DATABASE_URL</code>:</strong> اتصال MongoDB.</li>
+<li><strong><code>JWT_SECRET</code></strong>, <strong><code>JWT_EXPIRES_IN</code></strong> (اختياري).</li>
+<li><strong><code>GROQ_API_KEY</code>:</strong> لشات الاستشارة ومسار الـ AI.</li>
+<li><strong><code>CLOUDINARY_*</code>:</strong> لرفع صور البورتفوليو.</li>
+<li><strong><code>PORT</code>:</strong> منفذ السيرفر.</li>
+</ul>
+<p>ملف <code>.env.example</code> في المشروع <strong>ناقص</strong> لهذه المتغيرات؛ يُفضّل توسيعه لتوثيق كل المفاتيح دون كشف القيم الحقيقية.</p>
+<hr>
+<h2>15. أهم ما تراجع عليه (قائمة تحقق سريعة)</h2>
+<ol>
+<li><strong>أمان البورتفوليو:</strong> استبدال هيدر <code>userid</code> بمصادقة JWT و<code>req.user.id</code>.</li>
+<li><strong>اتساق معالجة الأخطاء:</strong> <code>errorMiddleware</code> vs <code>errorController</code> — واحد فقط كمصدر حقيقة.</li>
+<li><strong>تكرار موديل <code>Service</code>:</strong> احذف أو ادمج مع <code>serviceModel.js</code>.</li>
+<li><strong>تسجيل الدخول والتوكن:</strong> تطابق حقول <code>axios</code> مع استجابة السيرفر (<code>token</code> في JSON).</li>
+<li><strong>مسار <code>/service</code> في <code>App.jsx</code>:</strong> منطق التوجيه عند عدم تسجيل الدخول.</li>
+<li><strong>إحصائيات المنصة:</strong> هل الأرقام تجريبية أم يجب ربطها ببيانات حقيقية؟</li>
+<li><strong>كوكي <code>secure</code>:</strong> false مناسب لـ localhost فقط؛ عند النشر على HTTPS غيّر إلى true.</li>
+<li><strong><code>aiController</code>:</strong> إزالة استيراد <code>Consultation</code> غير المستخدم أو تفعيل الحفظ في قاعدة البيانات.</li>
+<li><strong>موديلان/مساران لـ Groq:</strong> فهم الفرق بين شات سريع (<code>chatController</code>) واستشارة بموديل أكبر (<code>aiController</code>).</li>
+<li><strong>CORS:</strong> إضافة أي دومين إنتاج جديد لـ <code>allowedOrigins</code>.</li>
+</ol>
+<hr>
+<h2>16. خريطة الـ API (مرجع سريع)</h2>
+<ul>
+<li><code>POST /api/v1/users/signup</code> — تسجيل  </li>
+<li><code>POST /api/v1/users/login</code> — دخول  </li>
+<li><code>GET /api/v1/users/getMe</code> — بياناتي (محمي)  </li>
+<li><code>PATCH /api/v1/users/updateMe</code> — تحديث البروفايل + صورة (محمي)  </li>
+<li><code>DELETE /api/v1/users/deleteMe</code> — تعطيل الحساب (محمي)  </li>
+<li><code>GET|POST|PATCH|DELETE /api/v1/services/...</code> — خدمات (كلها محمية)  </li>
+<li><code>POST /api/v1/ai/consult</code> — استشارة AI (محمي)  </li>
+<li><code>GET|POST /api/v1/chat</code> — تاريخ الشات وإرسال رسالة (محمي)  </li>
+<li><code>GET /api/v1/stats</code> و <code>GET /api/v1/stats/about-info</code> — إحصائيات  </li>
+<li><code>GET|POST|DELETE /api/v1/portfolio</code> — بورتفوليو (هيدر <code>userid</code> حالياً)</li>
+</ul>
+<hr>
+<p><em>آخر تحديث للوثيقة: أبريل 2026 — مبني على نسخة المشروع الحالية في المستودع.</em></p>
+
+<p style="margin-top:3rem;color:#666;font-size:10pt;">لحفظ كـ PDF: من المتصفح اختر طباعة ثم «حفظ كـ PDF» أو Microsoft Print to PDF.</p>
+</body>
+</html>

@@ -49,7 +49,7 @@ const userRoutes = require("./Routes/userRoutes");
 const aiRouter = require("./Routes/aiRoutes");
 const chatRouter = require('./Routes/chatRoutes');
 const statsRouter = require('./Routes/statsRoutes');
-const portfolioRouter = require('./Routes/portfolioRoutes').default;
+const portfolioRouter = require('./Routes/portfolioRoutes');
 
 // 5. تعريف المسارات (Routes)
 app.use("/api/v1/services", serviceRoutes);
